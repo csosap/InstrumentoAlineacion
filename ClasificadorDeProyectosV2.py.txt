@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# Importar las bibliotecas necesarias
+import pandas as pd
+from rich.console import Console
+
+# Inicializar el objeto Console para usar rich
+console = Console()
+
+# Cargar los datos desde un archivo Excel con múltiples hojas
+archivo = 'Base_Datos_Marcos_Estrategicos2.xlsx'
+df_subsectores = pd.read_excel(archivo, sheet_name='CAD_PALABRAS')  # Hoja con subsectores
+df_ods = pd.read_excel(archivo, sheet_name='ODS_PALABRA')  # Hoja con ODSS
+df_pmi = pd.read_excel(archivo, sheet_name='PMI2018_2033')  # Hoja con PMI2018_2033
+df_enci = pd.read_excel(archivo, sheet_name='ENCI')  # Hoja con ENCI
+
+# Asegurarse de que la columna 'PALABRAS CLAVE' contenga solo cadenas
+df_subsectores['PALABRAS CLAVE'] = df_subsectores['PALABRAS CLAVE'].apply(lambda x: x if isinstance(x, str) else '')
+df_ods['PALABRAS CLAVE'] = df_ods['PALABRAS CLAVE'].apply(lambda x: x if isinstance(x, str) else '')
+df_pmi['PALABRAS CLAVE'] = df_pmi['PALABRAS CLAVE'].apply(lambda x: x if isinstance(x, str) else '')
+df_enci['PALABRAS CLAVE'] = df_enci['PALABRAS CLAVE'].apply(lambda x: x if isinstance(x, str) else '')
+
+# Función para asociar sectores y subcategorías
+def asociar_sectores_y_subcategorias(descripcion):
+    descripcion_lower = descripcion.lower()
+    conteo_coincidencias = {}
+    conteo_subcategorias = {}
+
+    for index, row in df_subsectores.iterrows():
+        if isinstance(row['PALABRAS CLAVE'], str):
+            palabras_clave = row['PALABRAS CLAVE'].lower().split(', ')
+            coincidencias = sum(1 for palabra in palabras_clave if palabra in descripcion_lower)
+
+            if coincidencias > 0:
+                sector = row['SECTOR CAD']  # Asegúrate de que este nombre sea correcto
+                conteo_coincidencias[sector] = conteo_coincidencias.get(sector, 0) + coincidencias
+                
+                subcategoria = row['SUBSECTOR CRS']  # Asegúrate de que este nombre sea correcto
+                conteo_subcategorias[subcategoria] = conteo_subcategorias.get(subcategoria, 0) + coincidencias
+
+    sectores_ordenados = sorted(conteo_coincidencias.items(), key=lambda item: item[1], reverse=True)
+    subcategorias_ordenadas = sorted(conteo_subcategorias.items(), key=lambda item: item[1], reverse=True)
+
+    return sectores_ordenados[:3], subcategorias_ordenadas[:3]
+
+# Función para asociar ODS
+def asociar_ods(descripcion):
+    descripcion_lower = descripcion.lower()
+    conteo_coincidencias = {}
+    
+    for index, row in df_ods.iterrows():
+        if isinstance(row['PALABRAS CLAVE'], str):
+            palabras_clave = row['PALABRAS CLAVE'].lower().split(', ')
+            coincidencias = sum(1 for palabra in palabras_clave if palabra in descripcion_lower)
+            
+            if coincidencias > 0:
+                objetivo = row['ODS']  # Asegúrate de que este nombre sea correcto
+                conteo_coincidencias[objetivo] = conteo_coincidencias.get(objetivo, 0) + coincidencias
+
+    objetivos_ordenados = sorted(conteo_coincidencias.items(), key=lambda item: item[1], reverse=True)
+    return objetivos_ordenados[:3]
+
+# Función para asociar pilares
+def asociar_pilares(descripcion):
+    descripcion_lower = descripcion.lower()
+    conteo_coincidencias = {}
+    
+    for index, row in df_pmi.iterrows():
+        if isinstance(row['PALABRAS CLAVE'], str):
+            palabras_clave = row['PALABRAS CLAVE'].lower().split(', ')
+            coincidencias = sum(1 for palabra in palabras_clave if palabra in descripcion_lower)
+            
+            if coincidencias > 0:
+                pilar = row['PILAR']  # Asegúrate de que este nombre sea correcto
+                conteo_coincidencias[pilar] = conteo_coincidencias.get(pilar, 0) + coincidencias
+
+    pilares_ordenados = sorted(conteo_coincidencias.items(), key=lambda item: item[1], reverse=True)
+    return pilares_ordenados[:3]
+
+# Nueva función para asociar palabras clave con los objetivos y líneas estratégicas de ENCI
+def asociar_objetivos_y_lineas_estrategicas(descripcion):
+    descripcion_lower = descripcion.lower()
+    conteo_objetivos = {}
+    conteo_lineas = {}
+    
+    for index, row in df_enci.iterrows():
+        if isinstance(row['PALABRAS CLAVE'], str):
+            palabras_clave = row['PALABRAS CLAVE'].lower().split(', ')
+            coincidencias = sum(1 for palabra in palabras_clave if palabra in descripcion_lower)
+            
+            if coincidencias > 0:
+                objetivo = row['Objetivos']  # Asegúrate de que este nombre sea correcto
+                conteo_objetivos[objetivo] = conteo_objetivos.get(objetivo, 0) + coincidencias
+                
+                linea_estrategica = row['Linea estrategica']  # Asegúrate de que este nombre sea correcto
+                conteo_lineas[linea_estrategica] = conteo_lineas.get(linea_estrategica, 0) + coincidencias
+
+    objetivos_ordenados = sorted(conteo_objetivos.items(), key=lambda item: item[1], reverse=True)
+    lineas_ordenadas = sorted(conteo_lineas.items(), key=lambda item: item[1], reverse=True)
+    
+    return objetivos_ordenados[:3], lineas_ordenadas[:3]
+
+# Menú interactivo
+def menu():
+    console.print("Seleccione la opción de asociación:", style="bold green")
+    console.print("1. Asociar subsectores de CAD")
+    console.print("2. Asociar objetivos ODS")
+    console.print("3. Asociar pilares de PMI2018_2033")
+    console.print("4. Asociar objetivos y líneas estratégicas de ENCI")
+    
+    opcion = input("Ingrese el número de opción (1, 2, 3 o 4): ")
+    
+    if opcion in ['1', '2', '3', '4']:
+        descripcion_proyecto = input("Ingresa el nombre del proyecto o descripción corta: ")
+        
+        if opcion == '1':
+            sectores_asociados, subcategorias_asociadas = asociar_sectores_y_subcategorias(descripcion_proyecto)
+            if sectores_asociados:
+                console.print("[bold blue]Sectores asociados con mayor coincidencia:[/bold blue]")
+                for sector, coincidencias in sectores_asociados:
+                    console.print(f"{sector}: {coincidencias} coincidencias")
+            else:
+                console.print("No se encontraron sectores asociados.")
+
+            if subcategorias_asociadas:
+                console.print("[bold blue]Subcategorías asociadas con mayor coincidencia:[/bold blue]")
+                for subcategoria, coincidencias in subcategorias_asociadas:
+                    console.print(f"{subcategoria}: {coincidencias} coincidencias")
+            else:
+                console.print("No se encontraron subcategorías asociadas.")
+        
+        elif opcion == '2':
+            objetivos_asociados = asociar_ods(descripcion_proyecto)
+            if objetivos_asociados:
+                console.print("[bold blue]Objetivos ODS asociados con mayor coincidencia:[/bold blue]")
+                for objetivo, coincidencias in objetivos_asociados:
+                    console.print(f"{objetivo}: {coincidencias} coincidencias")
+            else:
+                console.print("No se encontraron objetivos ODS asociados.")
+        
+        elif opcion == '3':
+            pilares_asociados = asociar_pilares(descripcion_proyecto)
+            if pilares_asociados:
+                console.print("[bold blue]Pilares asociados con mayor coincidencia:[/bold blue]")
+                for pilar, coincidencias in pilares_asociados:
+                    console.print(f"{pilar}: {coincidencias} coincidencias")
+            else:
+                console.print("No se encontraron pilares asociados.")
+        
+        elif opcion == '4':
+            objetivos_asociados, lineas_estrategicas_asociadas = asociar_objetivos_y_lineas_estrategicas(descripcion_proyecto)
+            if objetivos_asociados:
+                console.print("[bold blue]Objetivos asociados con mayor coincidencia:[/bold blue]")
+                for objetivo, coincidencias in objetivos_asociados:
+                    console.print(f"{objetivo}: {coincidencias} coincidencias")
+            else:
+                console.print("No se encontraron objetivos asociados.")
+                
+            if lineas_estrategicas_asociadas:
+                console.print("[bold blue
